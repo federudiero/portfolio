@@ -58,12 +58,28 @@ function makeStatic(element) {
 export function useScrollAnimations() {
   useEffect(() => {
     const root = document.documentElement;
-    const reducedMotion = false;
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     const elements = getMotionElements();
     const sections = Array.from(document.querySelectorAll('[data-section-motion]'));
     const tiltCards = Array.from(document.querySelectorAll('.tilt-card'));
     let frameId = 0;
     let sectionObserver = null;
+
+    const revealVisibleSections = () => {
+      const viewportHeight = window.innerHeight || 1;
+
+      sections.forEach((section) => {
+        if (section.classList.contains('section-visible')) return;
+
+        const rect = section.getBoundingClientRect();
+        const enteredViewport = rect.top < viewportHeight * 0.88 && rect.bottom > viewportHeight * 0.04;
+
+        if (!enteredViewport) return;
+
+        section.classList.add('section-visible');
+        sectionObserver?.unobserve(section);
+      });
+    };
 
     root.classList.remove('scroll-engine', 'scroll-engine-reduced');
     root.classList.add('scroll-engine');
@@ -99,8 +115,8 @@ export function useScrollAnimations() {
           });
         },
         {
-          threshold: 0.16,
-          rootMargin: '0px 0px -12% 0px',
+          threshold: 0.01,
+          rootMargin: '0px 0px -8% 0px',
         },
       );
 
@@ -118,6 +134,8 @@ export function useScrollAnimations() {
       root.style.setProperty('--scroll-progress', pageProgress.toFixed(5));
       root.style.setProperty('--scroll-drift-x', `${Math.round(pageProgress * 150)}px`);
       root.style.setProperty('--scroll-drift-y', `${Math.round(pageProgress * -110)}px`);
+
+      revealVisibleSections();
 
       elements.forEach((element) => {
         const rect = element.getBoundingClientRect();
@@ -186,15 +204,8 @@ export function useScrollAnimations() {
     };
 
     update();
-    requestAnimationFrame(() => {
-      sections.forEach((section) => {
-        const rect = section.getBoundingClientRect();
-        if (rect.top < window.innerHeight * 0.86 && rect.bottom > 0) {
-          section.classList.add('section-visible');
-          sectionObserver?.unobserve(section);
-        }
-      });
-    });
+    requestAnimationFrame(revealVisibleSections);
+    window.setTimeout(revealVisibleSections, 220);
 
     window.addEventListener('scroll', requestUpdate, { passive: true });
     window.addEventListener('resize', requestUpdate);
